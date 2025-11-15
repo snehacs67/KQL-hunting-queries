@@ -5,6 +5,13 @@ severity: High
   queryPeriod: PT30M
   triggerOperator: GreaterThan
   triggerThreshold: 0
+ suppressionDuration: PT1H
+  suppressionEnabled: false
+  incidentConfiguration:
+    createIncident: true
+    groupingConfiguration:
+      enabled: true
+      lookbackDuration: PT1H
  matchingMethod: AllEntities
  entityMappings:
     - entityType: Account
@@ -31,11 +38,3 @@ severity: High
     | project Timestamp, Group, AddedAccount, GroupAdditionInitiatedBy
     | where Group has_any (SensitiveGroups)
     | order by Timestamp desc
-  suppressionDuration: PT1H
-  suppressionEnabled: false
-  incidentConfiguration:
-    createIncident: true
-    groupingConfiguration:
-      enabled: true
-      lookbackDuration: PT1H
- 
