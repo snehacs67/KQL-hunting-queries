@@ -1,0 +1,47 @@
+Brute Force Detection with IP Correlation
+description: Detects potential brute force attacks followed by successful login attempts, including source IP correlation.
+severity: High
+enabled: true
+queryFrequency: 15m
+queryPeriod: 1h
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionEnabled: false
+suppressionDuration: 5h
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: false
+    reopenClosedIncident: false
+    lookbackDuration: 5h
+    matchingMethod: AllEntities
+eventGroupingSettings:
+  aggregationKind: AlertPerResult
+customDetails:
+  Account: AccountUpn
+  SuccessfulAttempts: SuccessfulAttempts
+  FailedAttempts: FailedAttempts
+  SourceIPs: SourceIPs
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: AccountUpn
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: SourceIPs
+
+Query:
+  let FailedLogonsThreshold = 10;
+  let SuccessfulLogonsThreshold = 1;
+  let TimeWindow = 15m;
+  IdentityLogonEvents
+  | where isnotempty(AccountUpn)
+  | summarize
+      TotalAttempts = count(),
+      SuccessfulAttempts = countif(ActionType == "LogonSuccess"),
+      FailedAttempts = countif(ActionType == "LogonFailed"),
+      SourceIPs = make_set(IPAddress)
+      by bin(Timestamp, TimeWindow), AccountUpn
+  | where SuccessfulAttempts >= SuccessfulLogonsThreshold and FailedAttempts >= FailedLogonsThreshold
