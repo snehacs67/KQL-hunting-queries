@@ -1,0 +1,41 @@
+Name: Sensitive Group Membership Change Detection.
+description: Detects when accounts are added to sensitive groups like Domain Admins, Enterprise Admins, Exchange Admins.
+severity: High
+  queryFrequency: PT10M   
+  queryPeriod: PT30M
+  triggerOperator: GreaterThan
+  triggerThreshold: 0
+ matchingMethod: AllEntities
+ entityMappings:
+    - entityType: Account
+      fieldMappings:
+        - identifier: FullName
+          columnName: AddedAccount
+    - entityType: Account
+      fieldMappings:
+        - identifier: FullName
+          columnName: GroupAdditionInitiatedBy
+    - entityType: SecurityGroup
+      fieldMappings:
+        - identifier: Name
+          columnName: Group
+
+  Query:
+    let SensitiveGroups = dynamic(['Domain Admins', 'Enterprise Admins', 'Exchange Admins']);
+    IdentityDirectoryEvents
+    | where Timestamp > ago(30d)
+    | where ActionType == "Group Membership changed"
+    | extend Group = parse_json(AdditionalFields).['TO.GROUP']
+    | extend GroupAdditionInitiatedBy = parse_json(AdditionalFields).['ACTOR.ACCOUNT']
+    | extend AddedAccount = parse_json(AdditionalFields).['TARGET.ACCOUNT']
+    | project Timestamp, Group, AddedAccount, GroupAdditionInitiatedBy
+    | where Group has_any (SensitiveGroups)
+    | order by Timestamp desc
+  suppressionDuration: PT1H
+  suppressionEnabled: false
+  incidentConfiguration:
+    createIncident: true
+    groupingConfiguration:
+      enabled: true
+      lookbackDuration: PT1H
+ 
