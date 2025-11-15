@@ -1,0 +1,36 @@
+Name:LDAP Cleartext Authentication Detected
+  description: Detects accounts using LDAP cleartext authentication over the last 30 days.
+  severity: Medium
+  tactics:
+    - CredentialAccess
+    - DefenseEvasion
+  techniques:
+    - T1078  # Valid Accounts
+    - T1556  # Modify Authentication Process
+  queryFrequency: PT10M        
+  queryPeriod: PT30M          
+  triggerOperator: GreaterThan
+  triggerThreshold: 0
+  suppressionDuration: PT1H
+  suppressionEnabled: false
+  incidentConfiguration:
+    createIncident: true
+    groupingConfiguration:
+      enabled: true
+      lookbackDuration: PT1H
+      matchingMethod: AllEntities
+  entityMappings:
+    - entityType: Account
+      fieldMappings:
+        - identifier: FullName
+          columnName: AccountUpn
+  Query: 
+    IdentityLogonEvents
+    | where TimeGenerated > ago(15d)
+    | where LogonType == "LDAP cleartext"
+    | summarize
+        ['Total connection count'] = count(),
+        ['Distinct destination device count'] = dcount(DestinationDeviceName),
+        ['List of destination devices'] = make_set(DestinationDeviceName)
+        by AccountUpn
+    | sort by ['Distinct destination device count'] desc
