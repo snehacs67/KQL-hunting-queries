@@ -1,5 +1,18 @@
 name: RDP and SMB Activity Correlation
 description: Detects accounts with successful RDP logons (RemoteInteractive) and SMB share access within the last 7 days.
+severity: High
+tactics:
+  - LateralMovement
+  - Execution
+techniques:
+  - T1021.001  # Remote Services: Remote Desktop Protocol
+  - T1021.002  # Remote Services: SMB/Windows Admin Shares
+queryFrequency: 1d
+queryPeriod: 7d
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionEnabled: true
+suppressionDuration: 1h
 entityMappings:
   - entityType: Account
     fieldMappings:
@@ -20,17 +33,6 @@ customDetails:
   SMB_TargetDevices: SMBDeviceList
   RDP_SourceIPs: SourceIPList
   SMB_SourceIPs: SMBSourceIPList
-severity: High
-tactics:
-  - LateralMovement
-  - Execution
-techniques:
-  - T1021.001  # Remote Services: Remote Desktop Protocol
-  - T1021.002  # Remote Services: SMB/Windows Admin Shares
-queryFrequency: 1d
-queryPeriod: 7d
-triggerOperator: GreaterThan
-triggerThreshold: 0
 
 Query: |
   let RDPActivity = IdentityLogonEvents
