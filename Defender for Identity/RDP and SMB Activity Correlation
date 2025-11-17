@@ -1,0 +1,59 @@
+name: RDP and SMB Activity Correlation
+description: Detects accounts with successful RDP logons (RemoteInteractive) and SMB share access within the last 7 days.
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: IPAddress
+eventGroupingSettings:
+  aggregationKind: AlertPerResult
+customDetails:
+  RDP_TargetDevices: TargetDeviceList
+  SMB_TargetDevices: SMBDeviceList
+  RDP_SourceIPs: SourceIPList
+  SMB_SourceIPs: SMBSourceIPList
+severity: High
+tactics:
+  - LateralMovement
+  - Execution
+techniques:
+  - T1021.001  # Remote Services: Remote Desktop Protocol
+  - T1021.002  # Remote Services: SMB/Windows Admin Shares
+queryFrequency: 1d
+queryPeriod: 7d
+triggerOperator: GreaterThan
+triggerThreshold: 0
+
+Query: |
+  let RDPActivity = IdentityLogonEvents
+  | where TimeGenerated > ago(7d)
+  | where ActionType == "LogonSuccess"
+  | where LogonType == "RemoteInteractive"  // Indicates RDP sessions
+  | summarize 
+      TargetDeviceList = make_set(DestinationDeviceName),
+      TargetDeviceCount = dcount(DestinationDeviceName),
+      SourceIPList = make_set(IPAddress)
+      by AccountName, DeviceName;
+  let SMBActivity = SecurityEvent
+  | where TimeGenerated > ago(7d)
+  | summarize 
+      SMBDeviceList = make_set(Computer),
+      SMBDeviceCount = dcount(Computer),
+      SMBSourceIPList = make_set(IpAddress)
+      by Account;
+  RDPActivity
+  | join kind=fullouter (
+      SMBActivity
+  ) on $left.AccountName == $right.Account
+  | project AccountName, DeviceName, TargetDeviceCount, TargetDeviceList, SourceIPList, SMBDeviceCount, SMBDeviceList, SMBSourceIPList
+  | sort by TargetDeviceCount desc
+
+
