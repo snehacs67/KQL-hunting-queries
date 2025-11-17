@@ -1,0 +1,36 @@
+Description: Detects successful policy-related changes such as adding, updating, or removing policies in cloud applications. These actions may indicate privilege escalation or configuration tampering.
+severity: High
+
+tactics:
+  - Defense Evasion
+  - Privilege Escalation
+techniques:
+  - T1562: Impair Defenses
+  - T1098: Account Manipulation
+
+Query: 
+  CloudAppEvents
+  | where ActionType in ("Update policy.", "Add policy.", "Remove-CrossTenantAccessPolicy", "Add policy to service principal.", "Write PolicyAssignments", "Update authorization policy.", "Delete policy.", "Add owner to policy.", "Write PolicyExemptions", "Remove-LabelPolicy")
+  | mv-expand ActivityObjects
+  | where ActivityObjects.Name != "DisplayName"
+  | where RawEventData["status"] == "Succeeded"
+  | extend AccountMoniker = RawEventData["AccountMoniker"],
+           AccountMonikerLocation = RawEventData["AccountMonikerLocation"],
+           EventName = RawEventData["EventName"],
+           EventNamespace = RawEventData["EventNamespace"],
+           Role = RawEventData["Role"],
+           RoleInstance = RawEventData["RoleInstance"],
+           RoleLocation = RawEventData["RoleLocation"],
+           HttpRequest = RawEventData["httpRequest"]
+  | summarize Count = count() by tostring(AccountMoniker),
+                               tostring(AccountMonikerLocation),
+                               AccountDisplayName,
+                               IPAddress,
+                               ActionType,
+                               ActivityType,
+                               tostring(EventName),
+                               tostring(EventNamespace),
+                               tostring(Role),
+                               tostring(RoleInstance),
+                               tostring(RoleLocation),
+                               tostring(HttpRequest)
