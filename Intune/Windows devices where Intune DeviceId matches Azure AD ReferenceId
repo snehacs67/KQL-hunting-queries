@@ -1,0 +1,10 @@
+Description: This query provides a quick report of Windows devices where Intune DeviceId matches Azure AD ReferenceId.
+
+Query: 
+  IntuneDevices
+  | where TimeGenerated > ago(180d)
+  | where OS == 'Windows'
+  | summarize arg_max(TimeGenerated, *) by DeviceName, startofweek(TimeGenerated)
+  | where DeviceId == ReferenceId
+  | summarize count() by startofweek(TimeGenerated), JoinType
+  | render columnchart with (kind=unstacked, title="Weekly Count of Windows Devices by Join Type")
