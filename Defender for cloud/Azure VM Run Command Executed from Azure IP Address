@@ -1,0 +1,18 @@
+Description: Detects when an Azure VM Run Command operation is executed from an Azure-owned IP address.This helps identify suspicious controlplane activity that might lead to lateral movement or persistence.
+
+tactics:
+  - "Execution"
+  - "Persistence"
+techniques:
+  - "T1059: Command and Scripting Interpreter"
+  - "T1078: Valid Accounts"
+
+Query:
+  AzureActivity
+  | where TimeGenerated > ago(1h)
+  | where OperationNameValue == "Microsoft.Compute/virtualMachines/runCommand/action"
+  | where ActivityStatusValue == "Succeeded"
+  | extend Actor = Caller, IPAddress = CallerIpAddress
+  | where IPAddress startswith "20." or IPAddress startswith "40." or IPAddress startswith "52." // Azure IP ranges
+  | project TimeGenerated, ResourceGroup, ResourceId, Actor, IPAddress, OperationNameValue, ActivityStatusValue
+  | order by TimeGenerated desc
