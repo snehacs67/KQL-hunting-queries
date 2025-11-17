@@ -1,0 +1,23 @@
+Description: Detects PuTTY (putty.exe) initiating successful network connections to public IP addresses, which may indicate SSH tunneling or unauthorized remote access.
+severity: Medium
+
+tactic: Command and Control
+      : Lateral Movement
+technique: T1021 # Remote Services
+         : T1090 # Proxy
+         : T1071 # Application Layer Protocol
+
+Query: |
+  DeviceNetworkEvents
+  | where ActionType == "ConnectionSuccess"
+  | where LocalIPType == "Private"
+  | where RemoteIPType == "Public"
+  | where InitiatingProcessCommandLine contains "putty.exe"
+  | project
+      TimeGenerated,
+      DeviceName,
+      InitiatingProcessAccountName,
+      LocalIP,
+      RemoteIP,
+      RemoteUrl,
+      RemotePort
