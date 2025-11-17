@@ -1,0 +1,28 @@
+Description: Detects when a service principal is granted access to an Azure Key Vault.
+
+tactics:
+  - "Privilege Escalation"
+  - "Persistence"
+techniques:
+  - "T1098: Account Manipulation"
+  - "T1555: Credentials from Password Stores"
+
+Query:
+  AzureDiagnostics
+  | where ResourceType == "VAULTS"
+  | where OperationName == "VaultPatch"
+  | where ResultType == "Success"
+  | project-rename ServicePrincipalAdded = addedAccessPolicy_ObjectId_g,
+                   Actor = identity_claim_http_schemas_xmlsoap_org_ws_2005_05_identity_claims_name_s,
+                   AddedKeyPolicy = addedAccessPolicy_Permissions_keys_s,
+                   AddedSecretPolicy = addedAccessPolicy_Permissions_secrets_s,
+                   AddedCertPolicy = addedAccessPolicy_Permissions_certificates_s
+  | where isnotempty(AddedKeyPolicy) or isnotempty(AddedSecretPolicy) or isnotempty(AddedCertPolicy)
+  | project TimeGenerated,
+            KeyVaultName = Resource,
+            ServicePrincipalAdded,
+            Actor,
+            IPAddressofActor = CallerIPAddress,
+            AddedSecretPolicy,
+            AddedKeyPolicy,
+            AddedCertPolicy
