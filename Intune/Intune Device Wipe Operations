@@ -1,0 +1,17 @@
+Description: This query identifies Intune device wipe operations performed in the last 24 hours and retrieves essential device details such as model, OS, and primary user.
+
+tactics:Impact
+
+techniques:T1561- Disk Wipe
+
+Query: 
+  IntuneAuditLogs
+  | where TimeGenerated > ago(1d)
+  | where OperationName == "wipe ManagedDevice"
+  | extend DeviceId = tostring(parse_json(tostring(parse_json(Properties).TargetObjectIds))[0])
+  | project TimeGenerated, Actor=Identity, DeviceId
+  | join kind=inner (
+      IntuneDevices
+      | summarize arg_max(TimeGenerated, *) by DeviceId
+  ) on DeviceId
+  | project TimeGenerated, Actor, DeviceId, Model, OS, PrimaryUser=UserEmail
