@@ -1,0 +1,24 @@
+Description: This query identifies successful sensitive operations performed on Azure Key Vaults, it helps detect potential misuse or unauthorized access to critical secrets and keys.
+
+tactics:
+  - "Credential Access"
+  - "Defense Evasion"
+techniques:
+  - T1555: "Credentials from Password Stores"
+  - T1531: "Account Access Removal"
+  - T1070: "Indicator Removal on Host"
+
+Query: 
+  let operationlist = dynamic(
+    ["VaultDelete", "KeyDelete", "SecretDelete", "SecretPurge", "KeyPurge", "SecretBackup", "KeyBackup", "SecretListDeleted", "CertificateCreate", "CertificatePurge"]);
+  AzureDiagnostics
+  | where ResourceType == "VAULTS" and ResultType == "Success"
+  | where OperationName in (operationlist)
+  | project TimeGenerated,
+      ResourceGroup,
+      SubscriptionId,
+      KeyVaultName = Resource,
+      KeyVaultTarget = id_s,
+      Actor = identity_claim_upn_s,
+      IPAddressofActor = CallerIPAddress,
+      OperationName
