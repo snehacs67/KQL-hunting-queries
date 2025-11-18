@@ -1,0 +1,43 @@
+Description: This analytic rule identifies when a file observed on an endpoint matches any file hash indicator of compromise (IOC) provided by the MISP threat intelligence feed. 
+
+Tactics:
+  - Execution
+  - Persistence
+  - DefenseEvasion
+Techniques:
+  - T1059
+  - T1070
+
+let iocLookback = 14d;   // Look back for IOCs from MISP
+let eventLookback = 1d;  // Look back for DeviceFileEvents
+// Combine DeviceFileEvents for multiple hash types
+let DeviceFileEvents_ = union
+    (DeviceFileEvents | where TimeGenerated >= ago(eventLookback) and isnotempty(SHA256) | extend FileHashValue = SHA256, FileHashType = "SHA256"),
+    (DeviceFileEvents | where TimeGenerated >= ago(eventLookback) and isnotempty(SHA1)   | extend FileHashValue = SHA1, FileHashType = "SHA1"),
+    (DeviceFileEvents | where TimeGenerated >= ago(eventLookback) and isnotempty(MD5)    | extend FileHashValue = MD5, FileHashType = "MD5");
+// Get active file hash indicators from MISP
+let FileHash_IOCs = ThreatIntelIndicators
+| where TimeGenerated >= ago(iocLookback)
+| where Active == true and (ExpirationDateTime > now() or isempty(ExpirationDateTime))
+| where IndicatorProvider == "MISP"
+| extend IndicatorType = replace(@"\[|\]|\""", "", tostring(split(ObservableKey, ":", 0)))
+| where IndicatorType == "file"
+| extend TI_FileHashValue = tolower(ObservableValue)
+| extend TI_FileHashType = replace("'", "", substring(ObservableKey, indexof(ObservableKey, "hashes.") + 7, strlen(ObservableKey) - indexof(ObservableKey, "hashes.") - 7))
+| summarize arg_max(TimeGenerated, *) by IndicatorId;
+// Join DeviceFileEvents with MISP IOCs
+FileHash_IOCs
+| join kind=innerunique (
+    DeviceFileEvents_
+    | extend DeviceFileHash = tolower(FileHashValue)
+) on $left.TI_FileHashValue == $right.DeviceFileHash
+| where TimeGenerated < ExpirationDateTime
+| summarize EventTime = arg_max(TimeGenerated, *) by IndicatorId, DeviceId
+| extend
+    Description = tostring(parse_json(Data).description),
+    ConfidenceScore = tostring(parse_json(Data).confidence),
+    TrafficLightProtocolLevel = tostring(parse_json(AdditionalFields).TLPLevel),
+    ActivityGroupNames = extract(@"ActivityGroup:(\S+)", 1, tostring(parse_json(Data).labels))
+| project EventTime, IndicatorId, TI_FileHashValue, TI_FileHashType, ConfidenceScore, TrafficLightProtocolLevel,
+          Description, ActivityGroupNames, DeviceId, DeviceName, FileName, FolderPath, ActionType, RequestAccountName, MachineGroup
+| extend timestamp = EventTime
